@@ -1,0 +1,185 @@
+{% extends "base.html" %}
+{% load ui %}
+{% block title %}{{ period.name }} — Invigilation Duties{% endblock %}
+{% block content %}
+<h1>{{ period.name }}</h1>
+<p class="subtitle">
+  {{ period.start_date|date:"d M Y" }} – {{ period.end_date|date:"d M Y" }}
+  · <span class="badge {{ period.status|tone }}">{{ period.stage_label }}</span>
+  {% if period.exam_type %}· {{ period.exam_type }}{% endif %}{% if period.term %} · {{ period.term }}{% endif %}
+  {% if not period.is_finished %}· <a href="{% url 'period_details' period.pk %}">Edit details</a> · <a href="{% url 'admin:exams_examperiod_change' period.pk %}">Rules for rooms and days</a>{% endif %}
+</p>
+{% if period.departments.exists %}<p class="muted">Departments: {{ period.departments.all|join:", " }}</p>{% endif %}
+{% if period.remarks %}<p class="muted">{{ period.remarks|linebreaksbr }}</p>{% endif %}
+{% if period.status == "cancelled" %}<div class="alert warning"><span>Cancelled {{ period.status_changed_at|date:"d M Y" }}: {{ period.cancel_reason }}</span></div>{% endif %}
+
+{% if not capacity.ok %}
+  <div class="alert warning">Need {{ capacity.seats_needed }} duties, only {{ capacity.capacity }} possible. Raise the cap or add faculty.</div>
+{% endif %}
+{% include "allocation/_conflicts.html" %}
+{% if swaps_waiting %}
+  <div class="alert warning">{{ swaps_waiting }} swap(s) waiting for approval. <a href="{% url 'admin_swaps' %}">Review swaps</a></div>
+{% endif %}
+{% if pending %}
+  <div class="alert warning">{{ pending.0 }} request(s) pending. If all are approved, capacity drops to {{ pending.1.capacity }} duties (need {{ pending.1.seats_needed }}). <a href="{% url 'admin_requests' %}">Review requests</a></div>
+{% endif %}
+{% if slot_shortages %}
+  <div class="alert warning">Some time slots need more invigilators than there are available faculty:
+    <ul>{% for name, needed, available in slot_shortages %}<li>{{ name }}: {{ needed }} needed, {{ available }} available</li>{% endfor %}</ul>
+  </div>
+{% endif %}
+
+<div class="grid">
+  <div class="card">
+    <h2>{% icon "clipboard" %}Duties</h2>
+    <div class="stat">{{ duty_count }}</div>
+    <div class="muted">assigned · {{ capacity.seats_needed }} seat(s) still empty</div>
+  </div>
+  <div class="card">
+    <h2>{% icon "chart" %}Fairness</h2>
+    <div class="stat">Min {{ stats.min }} · Max {{ stats.max }}</div>
+    <div class="muted">Average {{ stats.avg }} per eligible faculty member{% if capped_stats %} without a category rule{% endif %}{% if period.last_run %} · {{ period.last_run.soft_violations }} soft-rule exception(s) in last run{% endif %}</div>
+    {% for label, rule, s in capped_stats %}
+      <div class="muted">{{ label }} ({{ rule }}): min {{ s.min }} · max {{ s.max }} · average {{ s.avg }}</div>
+    {% endfor %}
+    <div class="muted"><a href="{% url 'workload_people' period.pk %}">Workload per person</a>{% if workload.below %} · {{ workload.below }} below target{% endif %}{% if workload.over %} · <span class="text-danger">{{ workload.over }} over limit</span>{% endif %}</div>
+  </div>
+  <div class="card">
+    <h2>{% icon "settings" %}Rules</h2>
+    <div class="muted">
+      Default maximum per person: {% if settings.max_duties_per_faculty %}{{ settings.max_duties_per_faculty }}{% else %}<strong>not set</strong>{% endif %}
+      · {{ workload.category_rules }} designation rule(s) · {{ workload.faculty_rules }} personal rule(s)<br>
+      {% if workload.no_target %}<span class="badge warn">{{ workload.no_target }} without a target</span><br>{% endif %}
+      Max {{ settings.max_duties_per_day }} per day · 1 invigilator per {{ settings.students_per_invigilator }} students (min {{ settings.min_invigilators_per_room }})<br>
+      Avoid back-to-back: {{ settings.avoid_back_to_back|yesno:"yes,no" }} · Avoid own course: {{ settings.exclude_course_teacher|yesno:"yes,no" }}
+    </div>
+    <div class="actions" style="margin-top:10px">
+      <a class="button secondary sm" href="{% url 'workload_rules' period.pk %}">{% icon "settings" %}Workload rules</a>
+      {% if workload.policy.confirmed_at %}<span class="badge ok">confirmed {{ workload.policy.confirmed_at|date:"d M" }}</span>{% else %}<span class="badge warn">not confirmed</span>{% endif %}
+    </div>
+  </div>
+</div>
+
+{% if editable %}
+<div class="card">
+  <h2>Faculty availability</h2>
+  {% if period.availability_is_open %}
+  <div class="actions">
+    <span>Availability open until <strong>{{ period.availability_deadline|date:"D d M Y, H:i" }}</strong>.</span>
+    <form method="post" action="{% url 'close_availability' period.pk %}">{% csrf_token %}<button class="secondary" type="submit">Close now</button></form>
+  </div>
+  {% else %}
+  <p class="muted">{% if period.availability_deadline %}The window closed on {{ period.availability_deadline|date:"D d M Y, H:i" }}. You can open it again.{% else %}Let faculty request the dates they can't invigilate before you allocate.{% endif %}</p>
+  <form method="post" action="{% url 'open_availability' period.pk %}" class="actions">
+    {% csrf_token %}
+    <label for="id_deadline" style="margin:0">Open until</label>
+    <input type="datetime-local" name="deadline" id="id_deadline" required style="max-width:240px">
+    <button type="submit">{% icon "calendar" %}Open availability</button>
+  </form>
+  {% endif %}
+</div>
+{% endif %}
+
+<div class="card">
+  <h2>Actions</h2>
+  <div class="actions">
+    <a class="button secondary" href="{% url 'period_check' period.pk %}">{% icon "check-square" %}Check</a>
+    <a class="button secondary" href="{% url 'workload_rules' period.pk %}">{% icon "settings" %}Workload rules</a>
+    <a class="button secondary" href="{% url 'period_preferences' period.pk %}">{% icon "calendar" %}Preferences</a>
+    <a class="button secondary" href="{% url 'period_backups' period.pk %}">{% icon "users" %}Backups</a>
+    {% if not period.is_draft %}<a class="button secondary" href="{% url 'roster_versions' period.pk %}">{% icon "file" %}Roster versions</a>{% endif %}
+  </div>
+  <div class="actions" style="margin-top:10px">
+    {% if editable %}
+      <a class="button secondary" href="{% url 'schedule_import' period.pk %}">{% icon "upload" %}Import schedule</a>
+      <form method="post" action="{% url 'run_allocation' period.pk %}">{% csrf_token %}<button type="submit">{% icon "play" %}Run allocation</button></form>
+      <form method="post" action="{% url 'clear_draft' period.pk %}" onsubmit="return confirm('Remove every duty in this draft, including manual ones?');">{% csrf_token %}<button class="danger" type="submit">{% icon "trash" %}Clear draft</button></form>
+      {% if duty_count %}<a class="button" href="{% url 'publish' period.pk %}">{% icon "send" %}Review and publish</a>{% endif %}
+    {% else %}
+      <span class="muted">This period is {{ period.get_status_display|lower }}; the roster can no longer be edited here.</span>
+    {% endif %}
+  </div>
+</div>
+
+{% if lifecycle %}
+<div class="card">
+  <h2>Period status</h2>
+  <div class="actions">
+    {% for action, label, needs_reason, confirm_text in lifecycle %}
+    <form method="post" action="{% url 'period_status' period.pk %}" class="filters">
+      {% csrf_token %}<input type="hidden" name="action" value="{{ action }}">
+      {% if needs_reason %}<input type="text" name="reason" placeholder="Reason" aria-label="Reason for {{ label|lower }}" maxlength="300" required>{% endif %}
+      <button class="{% if action == 'cancel' %}danger{% else %}secondary{% endif %}" type="submit"{% if confirm_text %} onclick="return confirm('{{ confirm_text|escapejs }}');"{% endif %}>{{ label }}</button>
+    </form>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{% if duty_count %}
+<div class="card">
+  <h2>Downloads</h2>
+  <div class="actions">
+    <a class="button secondary" href="{% url 'roster_pdf' period.pk %}">{% icon "download" %}Roster (PDF)</a>
+    <a class="button secondary" href="{% url 'roster_xlsx' period.pk %}">{% icon "download" %}Roster (Excel)</a>
+    <a class="button secondary" href="{% url 'load_xlsx' period.pk %}">{% icon "download" %}Faculty load (Excel)</a>
+    {% if not period.is_draft %}
+    <a class="button secondary" href="{% url 'operations_report' period.pk %}">{% icon "chart" %}Attendance &amp; swaps report</a>
+    <a class="button secondary" href="{% url 'attendance' %}">{% icon "check-square" %}Mark attendance</a>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+{% if unfilled %}
+<div class="card table-wrap">
+  <h2>Unfilled seats</h2>
+  <table>
+    <thead><tr><th>Time slot</th><th>Course</th><th>Room</th><th>Missing</th><th>Reason</th></tr></thead>
+    <tbody>
+      {% for room, missing, reason in unfilled %}
+      <tr><td>{{ room.session.slot }}</td><td>{{ room.session.course_code }}</td><td>{% include "exams/_room_link.html" with room=room %}</td><td>{{ missing }}</td><td>{{ reason|default:"—" }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+{% if period.last_run and period.last_run.preferences.total %}
+<p class="muted">Last run: preferences met for {{ period.last_run.preferences.met }} of {{ period.last_run.preferences.total }} new duties given to people with preferences.</p>
+{% endif %}
+{% for s in slots %}
+<div class="card table-wrap" id="slot-{{ s.slot.pk }}">
+  <div class="page-head" style="margin-bottom:8px">
+    <h2 style="margin:0">{{ s.slot }}</h2>
+    <a class="button secondary sm" href="{% url 'slot_board' period.pk s.slot.pk %}">{% icon "users" %}Board</a>
+    {% if editable and duty_count %}<form method="post" action="{% url 'run_allocation' period.pk %}">{% csrf_token %}<input type="hidden" name="slot" value="{{ s.slot.pk }}"><button class="secondary sm" type="submit" title="Re-generate this time slot only; locked and manual duties stay">{% icon "repeat" %}Re-run this slot</button></form>{% endif %}
+  </div>
+  {% if s.rows %}
+  <table>
+    <thead><tr><th>Course</th><th>Room</th><th>Students</th><th>Invigilators</th></tr></thead>
+    <tbody>
+      {% for r in s.rows %}
+      <tr>
+        <td>{{ r.session.course_code }} — {{ r.session.course_name }}</td>
+        <td>
+          {% include "exams/_room_link.html" with room=r.room %}
+          {% if r.shared_with %}<div class="muted">Shared hall with {{ r.shared_with|join:", " }}</div>{% endif %}
+        </td>
+        <td>{{ r.room.student_count }}</td>
+        <td>
+          {{ r.names|join:", "|default:"—" }}
+          {% if r.short %}<span class="badge danger">{{ r.names|length }}/{{ r.needed }}</span>{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">No exams in this slot.</p>
+  {% endif %}
+</div>
+{% empty %}
+<div class="card"><p class="muted">No schedule yet. <a href="{% url 'schedule_import' period.pk %}">Import the exam schedule</a> to begin.</p></div>
+{% endfor %}
+{% endblock %}

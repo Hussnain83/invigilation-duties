@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% load ui %}
+{% block title %}Department duties — Invigilation Duties{% endblock %}
+{% block content %}
+<h1>Department duties</h1>
+<p class="subtitle">{% for d in departments %}{{ d.name }}{% if not forloop.last %}, {% endif %}{% endfor %}</p>
+
+{% if selected %}
+<div class="card">
+  <form method="get" class="actions">
+    <label for="id_period" style="margin:0">Exam period</label>
+    <select name="period" id="id_period" style="max-width:280px" onchange="this.form.submit()">
+      {% for p in periods %}<option value="{{ p.pk }}"{% if p == selected %} selected{% endif %}>{{ p.name }}</option>{% endfor %}
+    </select>
+    <input type="search" name="q" value="{{ q }}" placeholder="Name or employee ID" aria-label="Search faculty" style="max-width:220px">
+    <button class="secondary" type="submit">Search</button>
+    <a class="button secondary" href="{% url 'department_duties_xlsx' selected.pk %}">{% icon "download" %}Download Excel</a>
+  </form>
+</div>
+{% if summary %}
+<div class="card table-wrap">
+  <h2>Summary</h2>
+  {% include "reports/_summary_table.html" with rows=summary %}
+</div>
+{% endif %}
+<div class="card table-wrap">
+  <table class="stack">
+    <thead><tr><th>Name</th><th>Duties</th><th>Dates and rooms</th>{% if show_contacts %}<th>Contact</th>{% endif %}</tr></thead>
+    <tbody>
+      {% for r in rows %}
+      <tr><td data-label="Name">{{ r.faculty.name }}{% if r.faculty.is_exempt %} <span class="badge">exempt</span>{% endif %}</td><td data-label="Duties">{{ r.duties|length }}</td><td data-label="Dates and rooms">{{ r.summary|default:"—" }}</td>{% if show_contacts %}<td data-label="Contact">{{ r.faculty.phone_e164|default:"—" }}<div class="muted">{{ r.faculty.email|default:"" }}</div></td>{% endif %}</tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="card"><p class="muted">No roster has been published yet.</p></div>
+{% endif %}
+{% endblock %}

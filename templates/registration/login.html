@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}Log in — Invigilation Duties{% endblock %}
+{% block body_class %}auth{% endblock %}
+{% block content %}
+{% include "_auth_panel.html" %}
+<div class="auth-form">
+<div class="card login">
+  <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 12.5l3 3 7-7"/></svg></span>
+  <h1>Welcome back</h1>
+  <p class="subtitle">Log in with your university email to see your duties.</p>
+  {% if form.errors %}
+    <div class="alert error">Your email or password is incorrect.</div>
+  {% endif %}
+  <form method="post">
+    {% csrf_token %}
+    <div class="field">
+      <label for="id_username">Email</label>
+      <input type="email" name="username" id="id_username" autocomplete="email" required autofocus>
+    </div>
+    <div class="field">
+      <label for="id_password">Password</label>
+      <input type="password" name="password" id="id_password" autocomplete="current-password" required>
+    </div>
+    <input type="hidden" name="next" value="{{ next }}">
+    <button type="submit">Log in</button>
+  </form>
+  <p class="foot"><a href="{% url 'password_reset' %}">Forgot your password?</a></p>
+  {% if demo_site %}
+  <div class="alert info" style="margin-top:14px"><span><strong>Demo logins</strong> (password given to you with this link):<br>
+    Exam office: demo.admin@uni.edu<br>Head of department: demo.hod@uni.edu<br>Faculty: demo.faculty@uni.edu<br>Exam staff: demo.staff@uni.edu</span></div>
+  {% endif %}
+</div>
+{% if demo_site %}
+<section class="card demo-guide" aria-labelledby="demo-guide-title">
+  <h2 id="demo-guide-title">Try the demo</h2>
+  <p class="muted">Log in with one of the emails above, using the password sent with this link. Each login has its own menu on the left. The demo data resets when the site restarts.</p>
+
+  <div class="demo-role">
+    <strong>Exam office</strong> <code>demo.admin@uni.edu</code>
+    <ul>
+      <li>Open <em>Exam periods</em> and then <em>Demo Finals</em> to see the published roster.</li>
+      <li>Open <em>Reports</em> to download the roster as PDF or Excel.</li>
+      <li>Open <em>Audit log</em> to see every action taken so far.</li>
+    </ul>
+  </div>
+
+  <div class="demo-role">
+    <strong>Head of department</strong> <code>demo.hod@uni.edu</code>
+    <ul>
+      <li>Open <em>Department</em> to see this department's duties.</li>
+      <li>Open <em>Workload</em> to see how many duties each person has.</li>
+    </ul>
+  </div>
+
+  <div class="demo-role">
+    <strong>Faculty</strong> <code>demo.faculty@uni.edu</code>
+    <ul>
+      <li>Open <em>My duties</em> and download the PDF or the calendar file.</li>
+      <li>On one of your duties, choose <em>Ask a colleague</em> to try a swap.</li>
+    </ul>
+  </div>
+
+  <div class="demo-role">
+    <strong>Exam staff</strong> <code>demo.staff@uni.edu</code>
+    <ul>
+      <li>Open <em>Attendance</em> to see the exam slots.</li>
+      <li>Marking attendance unlocks once an exam has started. The demo exams are in the future, so you will see that rule apply.</li>
+    </ul>
+  </div>
+</section>
+{% endif %}
+</div>
+{% endblock %}

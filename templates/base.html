@@ -1,0 +1,118 @@
+{% load static ui %}<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>{% block title %}Invigilation Duties{% endblock %}</title>
+  <link rel="stylesheet" href="{% static 'css/app.css' %}?v=32">{# bump v= whenever app.css changes, so browsers fetch the new file #}
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%232f5bea'/%3E%3Cpath d='M7 12.5l3 3 7-7' stroke='white' stroke-width='2.4' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+</head>
+<body class="{% block body_class %}{% if user.is_authenticated %}app{% endif %}{% endblock %}">
+  <canvas id="floaters" aria-hidden="true"></canvas>
+  {% include "_icons.html" %}
+  {% with n=request.resolver_match.url_name %}
+  {% if user.is_authenticated %}
+  <aside class="sidebar" id="sidebar" aria-label="Main navigation">
+    <a class="brand" href="{% url 'home' %}">
+      <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 12.5l3 3 7-7"/></svg></span>
+      <span class="brand-text"><strong>Invigilation</strong><small>Duty management</small></span>
+    </a>
+
+    <nav class="side-nav">
+      {% if user.is_superuser or user.role == "admin" %}
+      <div class="nav-section">Overview</div>
+      <a href="{% url 'dashboard' %}" class="{% if n == 'dashboard' %}active{% endif %}">{% icon "chart" %}<span>Dashboard</span></a>
+      <a href="{% url 'report_center' %}" class="{% if n == 'report_center' %}active{% endif %}">{% icon "file" %}<span>Reports</span></a>
+      <a href="{% url 'period_list' %}" class="{% if n == 'period_list' or n == 'period_dashboard' or n == 'room_detail' or n == 'publish' or n == 'schedule_import' or n == 'replace_duty' or n == 'operations_report' or n == 'faculty_import' or n == 'department_import' %}active{% endif %}">{% icon "calendar" %}<span>Exam periods</span></a>
+      <a href="{% url 'search' %}" class="{% if n == 'search' %}active{% endif %}">{% icon "search" %}<span>Search</span></a>
+      <div class="nav-section">Data</div>
+      <a href="{% url 'faculty_list' %}" class="{% if n == 'faculty_list' or n == 'faculty_detail' or n == 'faculty_edit' or n == 'faculty_create' or n == 'faculty_categories' %}active{% endif %}">{% icon "users" %}<span>Faculty</span></a>
+      <a href="{% url 'room_list' %}" class="{% if n == 'room_list' or n == 'room_create' or n == 'room_edit' %}active{% endif %}">{% icon "building" %}<span>Rooms</span></a>
+      <a href="{% url 'import_home' %}" class="{% if n == 'import_home' or n == 'import_sheets' or n == 'import_start' or n == 'import_start_period' or n == 'import_columns' or n == 'import_batch' %}active{% endif %}">{% icon "upload" %}<span>Imports</span></a>
+      <div class="nav-section">Operations</div>
+      <a href="{% url 'admin_requests' %}" class="{% if n == 'admin_requests' %}active{% endif %}">{% icon "inbox" %}<span>Requests</span></a>
+      <a href="{% url 'admin_swaps' %}" class="{% if n == 'admin_swaps' %}active{% endif %}">{% icon "repeat" %}<span>Swaps</span></a>
+      <a href="{% url 'attendance' %}" class="{% if n == 'attendance' or n == 'attendance_slot' or n == 'record_stand_in' %}active{% endif %}">{% icon "check-square" %}<span>Attendance</span></a>
+      <a href="{% url 'missed_duties' %}" class="{% if n == 'missed_duties' or n == 'obligation' %}active{% endif %}">{% icon "calendar-x" %}<span>Missed duties</span></a>
+      <a href="{% url 'backup_pool' %}" class="{% if n == 'backup_pool' or n == 'period_backups' %}active{% endif %}">{% icon "users" %}<span>Backups</span></a>
+      <div class="nav-section">People &amp; system</div>
+      <a href="{% url 'accounts_page' %}" class="{% if n == 'accounts_page' %}active{% endif %}">{% icon "users" %}<span>Accounts</span></a>
+      <a href="{% url 'email_list' %}" class="{% if n == 'email_list' %}active{% endif %}">{% icon "mail" %}<span>Emails</span></a>
+      <a href="{% url 'whatsapp_settings' %}" class="{% if n == 'whatsapp_settings' or n == 'whatsapp_log' or n == 'whatsapp_tomorrow' or n == 'whatsapp_centre' or n == 'whatsapp_template' or n == 'whatsapp_contact' %}active{% endif %}">{% icon "send" %}<span>WhatsApp</span></a>
+      <a href="{% url 'hod_access' %}" class="{% if n == 'hod_access' %}active{% endif %}">{% icon "shield" %}<span>HOD permissions</span></a>
+      <a href="{% url 'audit_log' %}" class="{% if n == 'audit_log' %}active{% endif %}">{% icon "shield" %}<span>Audit log</span></a>
+      <a href="{% url 'admin:index' %}">{% icon "settings" %}<span>Admin panel</span></a>
+      {% elif user.role == "exam_staff" %}
+      <div class="nav-section">Exam day</div>
+      <a href="{% url 'attendance' %}" class="active">{% icon "check-square" %}<span>Attendance</span></a>
+      {% elif user.role == "faculty" or user.role == "hod" %}
+      <div class="nav-section">My work</div>
+      <a href="{% url 'my_duties' %}" class="{% if n == 'my_duties' or n == 'ask_colleague' %}active{% endif %}">{% icon "clipboard" %}<span>My duties</span></a>
+      <a href="{% url 'my_unavailability' %}" class="{% if n == 'my_unavailability' %}active{% endif %}">{% icon "calendar-x" %}<span>Unavailability</span></a>
+      <a href="{% url 'my_preferences' %}" class="{% if n == 'my_preferences' %}active{% endif %}">{% icon "calendar" %}<span>Preferences</span></a>
+      <a href="{% url 'my_whatsapp' %}" class="{% if n == 'my_whatsapp' %}active{% endif %}">{% icon "send" %}<span>WhatsApp</span></a>
+      <a href="{% url 'swap_requests' %}" class="{% if n == 'swap_requests' %}active{% endif %}">{% icon "repeat" %}<span>Swaps</span></a>
+      {% if user.role == "hod" %}
+      <div class="nav-section">My department</div>
+      <a href="{% url 'department_requests' %}" class="{% if n == 'department_requests' %}active{% endif %}">{% icon "inbox" %}<span>Approvals</span></a>
+      <a href="{% url 'department_duties' %}" class="{% if n == 'department_duties' %}active{% endif %}">{% icon "building" %}<span>Department</span></a>
+      {% if hod_access.see_workload %}<a href="{% url 'hod_workload' %}" class="{% if n == 'hod_workload' %}active{% endif %}">{% icon "chart" %}<span>Workload</span></a>{% endif %}
+      {% if hod_access.see_missed %}<a href="{% url 'hod_missed' %}" class="{% if n == 'hod_missed' %}active{% endif %}">{% icon "calendar-x" %}<span>Missed duties</span></a>{% endif %}
+      {% if hod_access.download_reports %}<a href="{% url 'hod_reports' %}" class="{% if n == 'hod_reports' %}active{% endif %}">{% icon "file" %}<span>Reports</span></a>{% endif %}
+      {% endif %}
+      {% endif %}
+    </nav>
+
+    <div class="side-user">
+      <span class="avatar" aria-hidden="true">{{ user.email|initials }}</span>
+      <span class="who">
+        <span class="who-email" title="{{ user.email }}">{{ user.email }}</span>
+        <span class="who-role">{% if user.is_superuser %}Superuser{% elif user.role == "admin" %}Exam office{% elif user.role == "hod" %}Head of department{% else %}{{ user.get_role_display }}{% endif %}</span>
+      </span>
+      <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button class="icon-button" type="submit" title="Log out" aria-label="Log out">{% icon "logout" %}</button></form>
+    </div>
+  </aside>
+  <div class="scrim" data-nav-close></div>
+
+  <div class="shell">
+    <header class="topbar">
+      <button class="icon-button menu-toggle" type="button" aria-label="Open menu" aria-controls="sidebar" data-nav-open>{% icon "menu" %}</button>
+      <button class="icon-button collapse-toggle" type="button" aria-label="Collapse or expand the menu" aria-controls="sidebar" aria-pressed="false" data-nav-collapse>{% icon "menu" %}</button>
+      {% if user.is_superuser or user.role == "admin" %}
+      <form class="top-search" method="get" action="{% url 'search' %}" role="search">
+        {% icon "search" %}
+        <input type="search" name="q" placeholder="Search people, faculty ID, phone, course or room…" aria-label="Search" value="{% if n == 'search' %}{{ request.GET.q }}{% endif %}">
+      </form>
+      {% else %}
+      <span class="top-title">{% if user.role == "exam_staff" %}Exam day attendance{% else %}Welcome back{% endif %}</span>
+      {% endif %}
+      {% if top_periods %}
+      <form class="top-period" method="get" action="{% url 'pick_period' %}">
+        <input type="hidden" name="next" value="{% url 'dashboard' %}">
+        <select name="period" aria-label="Exam period shown on the dashboard" onchange="this.form.submit()">
+          {% for p in top_periods %}<option value="{{ p.pk }}"{% if p.pk == top_period_id %} selected{% endif %}>{{ p.name }}</option>{% endfor %}
+        </select>
+        <noscript><button type="submit" class="secondary sm">Go</button></noscript>
+      </form>
+      {% endif %}
+      <span class="top-date">{% now "D d M Y" %}</span>
+      <a class="icon-button bell" href="{% url 'notifications' %}" aria-label="Notifications{% if unread_notifications %}: {{ unread_notifications }} new{% endif %}" title="Notifications">{% icon "bell" %}{% if unread_notifications %}<span class="bell-count">{{ unread_notifications }}</span>{% endif %}</a>
+    </header>
+  {% endif %}
+    <main>
+      {% if demo_site %}<div class="alert info demo-banner" role="note">{% icon "eye" %}<span><strong>Demo site</strong> — all names, numbers and duties here are sample data for demonstration.</span></div>{% endif %}
+      {% for message in messages %}
+        <div class="alert {{ message.tags }}" role="status">{% if message.tags == "success" %}{% icon "check" %}{% elif message.tags == "error" or message.tags == "warning" %}{% icon "alert" %}{% endif %}<span>{{ message }}</span></div>
+      {% endfor %}
+      {% block content %}{% endblock %}
+    </main>
+  {% if user.is_authenticated %}
+  </div>
+  {% endif %}
+  {% endwith %}
+  <script src="{% static 'js/filter.js' %}?v=1" defer></script>
+  <script src="{% static 'js/app.js' %}?v=2" defer></script>
+  <script src="{% static 'js/floaters.js' %}?v=1" defer></script>
+</body>
+</html>

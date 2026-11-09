@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% load ui %}
+{% block title %}Attendance {{ slot }} — Invigilation Duties{% endblock %}
+{% block content %}
+<h1>Attendance</h1>
+<p class="subtitle"><a href="{% url 'attendance' %}?date={{ slot.date|date:'Y-m-d' }}">← {{ slot.date|date:"D d M Y" }}</a> · {{ slot.start_time|time:"H:i" }}–{{ slot.end_time|time:"H:i" }} · {{ slot.period.name }}</p>
+
+{% if not started %}
+<div class="alert warning">This exam hasn't started yet. Attendance can be marked from {{ slot.start_time|time:"H:i" }}.</div>
+{% endif %}
+
+<div class="card filter-bar">
+  <input type="search" data-filter="#rooms" data-filter-items=".room-card" placeholder="Find a name, room or course" aria-label="Filter rooms">
+</div>
+<div id="rooms">
+<p class="muted" data-filter-empty hidden>Nothing matches.</p>
+{% for room in rooms %}
+<div class="card table-wrap room-card">
+  <div class="actions" style="justify-content:space-between">
+    <h2 style="margin:0">{{ room.room }} · {{ room.session.course_code }} <span class="muted">({{ room.student_count }} students)</span></h2>
+    {% if started %}
+    <form method="post" action="{% url 'attendance_room_present' room.pk %}">{% csrf_token %}<button class="secondary sm" type="submit">{% icon "check-square" %}Mark all present</button></form>
+    {% endif %}
+  </div>
+  {% if room.active_duties %}
+  <table class="stack">
+    <tbody>
+      {% for d in room.active_duties %}
+      <tr>
+        <td>{{ d.faculty.name }}</td>
+        <td>
+          {% if d.status == "completed" %}<span class="badge ok">Present</span>
+          {% elif d.status == "absent" %}<span class="badge danger">Absent</span>
+          {% else %}<span class="muted">Not marked</span>{% endif %}
+          {% if d.source == "stand_in" %}<span class="badge info">Stand-in</span>{% endif %}
+          {% if d.attendance_marked_by %}<div class="muted">by {{ d.attendance_marked_by.email }} {{ d.attendance_marked_at|date:"H:i" }}</div>{% endif %}
+          {% if d.needs_stand_in %}<div><a href="{% url 'record_stand_in' d.pk %}">Record stand-in</a></div>{% endif %}
+        </td>
+        <td>
+          {% if started and d.can_mark %}
+          <form method="post" action="{% url 'attendance_mark' d.pk %}" class="actions pair">
+            {% csrf_token %}
+            <button type="submit" name="present" value="1" class="{% if d.status == "completed" %}secondary{% else %}success{% endif %}">{% icon "check" %}Present</button>
+            <button class="danger" type="submit" name="present" value="0">{% icon "x" %}Absent</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<p class="muted">No invigilators assigned.</p>{% endif %}
+</div>
+{% empty %}
+<div class="card"><p class="muted">No rooms in this time slot.</p></div>
+{% endfor %}
+</div>
+{% endblock %}

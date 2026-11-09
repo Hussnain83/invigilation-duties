@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% load ui %}
+{% block title %}{{ room.room }} — {{ period.name }}{% endblock %}
+{% block content %}
+<h1>{{ room.session.course_code }} — {{ room.room }}</h1>
+<p class="subtitle">
+  <a href="{% url 'period_dashboard' period.pk %}">← {{ period.name }}</a>
+  · {{ room.session.slot }} · {{ room.session.course_name }} ({{ room.session.department }})
+  · {% if hall %}{{ room.student_count }} of the hall's {{ hall_students }} students{% else %}{{ room.student_count }} students · needs {{ room.invigilators_required }} invigilator(s){% endif %}
+</p>
+
+{% if hall %}
+<div class="alert info">
+  <strong>Shared hall.</strong> {% for r in hall %}{{ r.session.course_code }} ({{ r.student_count }}){% if not forloop.last %}, {% endif %}{% endfor %}
+  sit in {{ room.room }} at the same time: {{ hall_students }} students, one team of {{ hall_lead.invigilators_required }} invigilator(s) for all of them.
+  {% if room != hall_lead %}The team is listed under <a href="{% url 'room_detail' period.pk hall_lead.pk %}">{{ hall_lead.session.course_code }}</a>.{% endif %}
+</div>
+{% endif %}
+
+{% if pending %}
+<div class="alert warning">
+  Assigning <strong>{{ pending.0.name }}</strong> breaks a soft rule:
+  <ul>{% for w in pending.1 %}<li>{{ w }}</li>{% endfor %}</ul>
+  <div class="actions" style="margin-top:8px">
+    <form method="post" action="{% url 'add_duty' period.pk room.pk %}">
+      {% csrf_token %}
+      <input type="hidden" name="faculty_id" value="{{ pending.0.pk }}">
+      <input type="hidden" name="confirm" value="1">
+      <input type="text" name="reason" placeholder="Reason for the exception (kept in the audit log)" aria-label="Reason" maxlength="300" required style="max-width:360px">
+      <button type="submit">Assign anyway</button>
+    </form>
+    <a class="button secondary" href="{% url 'room_detail' period.pk room.pk %}">Cancel</a>
+  </div>
+</div>
+{% endif %}
+
+{% if room == hall_lead %}
+<div class="card table-wrap">
+  <h2>Assigned invigilators ({{ duties|length }}/{{ room.invigilators_required }})</h2>
+  {% if duties %}
+  <table>
+    <thead><tr><th>Name</th><th>Department</th><th>Source</th>{% if published %}<th>Attendance</th>{% endif %}<th></th></tr></thead>
+    <tbody>
+      {% for d in duties %}
+      <tr>
+        <td>{{ d.faculty.name }}{% if d.locked %} <span class="badge info">locked</span>{% endif %}</td>
+        <td>{{ d.faculty.department }}</td>
+        <td><span class="badge">{{ d.get_source_display }}</span></td>
+        {% if published %}<td>{{ d.get_status_display }}</td>{% endif %}
+        <td>
+          {% if editable %}
+          <div class="actions">
+          <a class="button secondary sm" href="{% url 'move_duty' period.pk d.pk %}">{% icon "repeat" %}Move</a>
+          <form method="post" action="{% url 'lock_duty' period.pk d.pk %}">{% csrf_token %}<input type="hidden" name="locked" value="{% if d.locked %}0{% else %}1{% endif %}"><button class="secondary sm" type="submit" title="Locked duties are kept when the allocation is run again">{% if d.locked %}Unlock{% else %}Lock{% endif %}</button></form>
+          <form method="post" action="{% url 'remove_duty' period.pk d.pk %}">{% csrf_token %}<button class="danger sm" type="submit">{% icon "trash" %}Remove</button></form>
+          </div>
+          {% elif can_replace and d.status == "assigned" %}
+          <div class="actions">
+          <a class="button secondary sm" href="{% url 'replace_duty' period.pk d.pk %}">{% icon "repeat" %}Replace</a>
+          <a class="button secondary sm" href="{% url 'move_duty' period.pk d.pk %}">Move</a>
+          </div>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">Nobody assigned yet.</p>
+  {% endif %}
+</div>
+
+{% if editable %}
+<div class="card">
+  <h2>Add an invigilator</h2>
+  {% if candidates %}
+  <p class="muted">Only faculty who pass every hard rule for this slot are listed, fewest duties first.</p>
+  <form method="post" action="{% url 'add_duty' period.pk room.pk %}">
+    {% csrf_token %}
+    <div class="field">
+      <select name="faculty_id" required>
+        {% for f, count, warnings in candidates %}
+        <option value="{{ f.pk }}">{{ f.name }} — {{ f.department }} — {{ count }} duties{% if warnings %} (⚠ {{ warnings|join:"; " }}){% endif %}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <button type="submit">{% icon "plus" %}Assign</button>
+  </form>
+  {% else %}
+  <p class="muted">No faculty member can take this seat without breaking a hard rule (already busy in this slot, unavailable, or at a cap).</p>
+  {% endif %}
+</div>
+{% endif %}
+{% endif %}
+{% endblock %}

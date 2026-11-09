@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% load ui %}
+{% block title %}My duties — Invigilation Duties{% endblock %}
+{% block content %}
+<h1>My duties</h1>
+<p class="subtitle">{{ request.faculty.name }} · {{ request.faculty.department }}</p>
+
+{% for p in periods %}
+<div class="card table-wrap">
+  <h2>{{ p.period.name }}</h2>
+  <div class="actions" style="margin-bottom:12px">
+    <a class="button secondary" href="{% url 'my_duties_pdf' p.period.pk %}">{% icon "download" %}Download PDF</a>
+    <a class="button secondary" href="{% url 'my_duties_ics' p.period.pk %}">{% icon "calendar" %}Add to calendar (.ics)</a>
+    {% if p.unconfirmed %}
+    <form method="post" action="{% url 'acknowledge_duties' p.period.pk %}">{% csrf_token %}<button type="submit">{% icon "check" %}I have seen these duties ({{ p.unconfirmed }} new)</button></form>
+    {% endif %}
+  </div>
+  {% if p.upcoming %}
+  <table class="stack">
+    <thead><tr><th>Date</th><th>Time</th><th>Course</th><th>Room</th><th></th></tr></thead>
+    <tbody>
+      {% for d in p.upcoming %}{% include "portal/_duty_row.html" with swap_col=True %}{% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">No upcoming duties.</p>
+  {% endif %}
+  {% if p.past %}
+  <details>
+    <summary class="muted">Past duties ({{ p.past|length }})</summary>
+    <table class="stack"><tbody>{% for d in p.past %}{% include "portal/_duty_row.html" %}{% endfor %}</tbody></table>
+  </details>
+  {% endif %}
+</div>
+{% empty %}
+<div class="card empty">{% icon "clipboard" %}<strong>No duties yet</strong>You'll get an email as soon as the roster is published.</div>
+{% endfor %}
+{% endblock %}
